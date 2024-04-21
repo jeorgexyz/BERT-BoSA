@@ -1,0 +1,20 @@
+BERT_BoSA/
+├── data/
+│   └── ag_news/
+│       ├── train.csv
+│       └── test.csv
+├── models/
+│   ├── __init__.py
+│   ├── bert.py
+│   └── classification_head.py
+├── utils/
+│   ├── __init__.py
+│   └── data_utils.py
+├── optimization/
+│   ├── __init__.py
+│   └── simulated_annealing.py
+├── config.py
+├── train.py
+├── eval.py
+├── requirements.txt
+└── README.md
