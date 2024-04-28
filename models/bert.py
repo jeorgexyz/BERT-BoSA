@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import random
 import math
+from config import initial_config
+
 
 class BERTEmbeddings(nn.Module):
     def __init__(self, vocab_size, embedding_dim, n_segments, dropout, max_len):
