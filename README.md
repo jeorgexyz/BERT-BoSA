@@ -75,6 +75,4 @@ BERT-BoSA/
 - **Model**: You can modify the `bert.py` and `classification_head.py` files to customize the BERT model architecture or the classification head.
 - **Optimization**: If you want to use a different optimization algorithm or modify the Simulated Annealing implementation, update the `simulated_annealing.py` file.
 
-## Contributing
 
-Contributions are welcome! If you find any issues or have suggestions for improvements, please open an issue or submit a pull request.
