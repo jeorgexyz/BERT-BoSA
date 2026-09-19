@@ -24,8 +24,9 @@ class BERTEmbeddings(nn.Module):
 
 
 class BERT(nn.Module):
-    def __init__(self, vocab_size, max_len, embedding_dim, n_segments, n_layers, attn_heads, dropout):
+    def __init__(self, vocab_size, max_len, embedding_dim, n_segments, n_layers, attn_heads, dropout, pad_idx=0):
         super(BERT, self).__init__()
+        self.pad_idx = pad_idx
         self.embeddings = BERTEmbeddings(vocab_size, embedding_dim, n_segments, dropout, max_len)
         # batch_first=True so input/output shape is (batch, seq_len, d_model)
         self.encoder_layer = nn.TransformerEncoderLayer(
@@ -34,8 +35,10 @@ class BERT(nn.Module):
         self.encoder_block = nn.TransformerEncoder(self.encoder_layer, num_layers=n_layers)
 
     def forward(self, seq, seg):
+        # True at padded positions so attention ignores them
+        pad_mask = seq == self.pad_idx
         out = self.embeddings(seq, seg)
-        out = self.encoder_block(out)
+        out = self.encoder_block(out, src_key_padding_mask=pad_mask)
         return out
 
 

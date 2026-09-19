@@ -1,37 +1,26 @@
+import argparse
+
 import torch
 
 from models.bert import BERT
 from models.classification_head import ClassificationHead
-from utils.data_utils import get_dataloaders
-
-
-def evaluate(bert, head, loader, device):
-    bert.eval()
-    head.eval()
-    correct = 0
-    total = 0
-
-    with torch.no_grad():
-        for seq, seg, labels in loader:
-            seq, seg, labels = seq.to(device), seg.to(device), labels.to(device)
-            out = bert(seq, seg)
-            cls_out = out[:, 0, :]      # [CLS] token
-            logits = head(cls_out)
-            preds = logits.argmax(dim=1)
-            correct += (preds == labels).sum().item()
-            total += labels.size(0)
-
-    return correct / total
+from utils.data_utils import Vocab, get_dataloaders
+from utils.train_utils import compute_accuracy
 
 
 def main():
+    parser = argparse.ArgumentParser(description='Evaluate a trained BERT-BoSA checkpoint')
+    parser.add_argument('--checkpoint', default='model.pt')
+    args = parser.parse_args()
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    checkpoint = torch.load('model.pt', map_location=device)
+    checkpoint = torch.load(args.checkpoint, map_location=device)
     config = checkpoint['config']
+    vocab = Vocab(checkpoint['vocab'])  # exact vocab from training, never rebuilt
 
     print("Loading data...")
-    _, test_loader, _ = get_dataloaders(config)
+    _, _, test_loader, _ = get_dataloaders(config, vocab=vocab)
 
     bert = BERT(
         config['vocab_size'],
@@ -47,7 +36,7 @@ def main():
     bert.load_state_dict(checkpoint['bert'])
     head.load_state_dict(checkpoint['head'])
 
-    accuracy = evaluate(bert, head, test_loader, device)
+    accuracy = compute_accuracy(bert, head, test_loader, device)
     print(f"Test Accuracy: {accuracy:.4f}")
 
 

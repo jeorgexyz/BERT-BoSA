@@ -1,3 +1,6 @@
+import argparse
+import random
+
 import torch
 import torch.nn as nn
 
@@ -6,11 +9,13 @@ from models.bert import BERT
 from models.classification_head import ClassificationHead
 from optimization.simulated_annealing import evaluate_bert_model, simulated_annealing
 from utils.data_utils import get_dataloaders
+from utils.train_utils import compute_accuracy
 
 
 def train_epoch(bert, head, loader, optimizer, criterion, device):
     bert.train()
     head.train()
+    params = list(bert.parameters()) + list(head.parameters())
     total_loss = 0.0
     correct = 0
     total = 0
@@ -23,6 +28,7 @@ def train_epoch(bert, head, loader, optimizer, criterion, device):
         logits = head(cls_out)
         loss = criterion(logits, labels)
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(params, 1.0)
         optimizer.step()
 
         total_loss += loss.item()
@@ -33,31 +39,58 @@ def train_epoch(bert, head, loader, optimizer, criterion, device):
     return total_loss / len(loader), correct / total
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description='Train BERT-BoSA on AG_NEWS')
+    parser.add_argument('--epochs', type=int, default=FIXED_CONFIG['epochs'],
+                        help='epochs for the final full training run')
+    parser.add_argument('--sa-iterations', type=int, default=15,
+                        help='simulated annealing iterations')
+    parser.add_argument('--sa-train-batches', type=int, default=100,
+                        help='training batches per SA candidate evaluation')
+    parser.add_argument('--skip-sa', action='store_true',
+                        help='skip the SA search and train with the initial config')
+    parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--output', default='model.pt', help='checkpoint path')
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
+    random.seed(args.seed)
+    torch.manual_seed(args.seed)
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
 
     # Merge SA-optimizable params with fixed hyperparameters
     config = {**FIXED_CONFIG, **initial_config}
+    config['epochs'] = args.epochs
 
     print("Loading data...")
-    train_loader, test_loader, vocab = get_dataloaders(config)
+    train_loader, val_loader, test_loader, vocab = get_dataloaders(config, seed=args.seed)
     config['vocab_size'] = len(vocab)
     print(f"Vocab size: {config['vocab_size']}")
 
-    # Run Simulated Annealing to find the best hyperparameter config
-    print("Running Simulated Annealing to optimise configuration...")
-    best_config = simulated_annealing(
-        evaluate_bert_model,
-        config,
-        temperature=1.0,
-        cooling_rate=0.9,
-        max_iterations=5,       # increase for a more thorough search
-        train_loader=train_loader,
-        device=device,
-        n_eval_batches=20,
-    )
-    print(f"\nBest config: {best_config}\n")
+    if args.skip_sa:
+        best_config = config
+    else:
+        # Run Simulated Annealing to find the best hyperparameter config.
+        # Cost is 1 - val_accuracy, so temperature is on the accuracy scale:
+        # 0.1 initially accepts ~5-point accuracy regressions with p≈0.6.
+        print("Running Simulated Annealing to optimise configuration...")
+        best_config = simulated_annealing(
+            evaluate_bert_model,
+            config,
+            temperature=0.1,
+            cooling_rate=0.85,
+            max_iterations=args.sa_iterations,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            device=device,
+            n_train_batches=args.sa_train_batches,
+            seed=args.seed,
+        )
+        print(f"\nBest config: {best_config}\n")
 
     # Full training with the best config
     print("Training with best config...")
@@ -80,13 +113,20 @@ def main():
 
     for epoch in range(best_config['epochs']):
         loss, acc = train_epoch(bert, head, train_loader, optimizer, criterion, device)
-        print(f"Epoch {epoch + 1}/{best_config['epochs']}  loss={loss:.4f}  acc={acc:.4f}")
+        val_acc = compute_accuracy(bert, head, val_loader, device)
+        print(f"Epoch {epoch + 1}/{best_config['epochs']}  "
+              f"loss={loss:.4f}  train_acc={acc:.4f}  val_acc={val_acc:.4f}")
 
     torch.save(
-        {'bert': bert.state_dict(), 'head': head.state_dict(), 'config': best_config},
-        'model.pt',
+        {
+            'bert': bert.state_dict(),
+            'head': head.state_dict(),
+            'config': best_config,
+            'vocab': vocab.token2idx,   # eval must use the exact training vocab
+        },
+        args.output,
     )
-    print("Saved model to model.pt")
+    print(f"Saved model to {args.output}")
 
 
 if __name__ == '__main__':

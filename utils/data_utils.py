@@ -1,3 +1,4 @@
+import random
 import re
 from collections import Counter
 from functools import partial
@@ -52,10 +53,10 @@ def _load_ag_news():
         from datasets import load_dataset
     except ImportError:
         raise ImportError(
-            "Run: pip install datasets\n"
-            "(torchtext is incompatible with your PyTorch version)"
+            "AG_NEWS is loaded via HuggingFace datasets. Run: pip install datasets"
         )
-    ds = load_dataset('ag_news')
+    # The canonical AG_NEWS copy moved under the fancyzhx namespace on the Hub
+    ds = load_dataset('fancyzhx/ag_news')
     # HuggingFace ag_news labels are 0–3; shift to 1–4 to stay consistent
     train_data = [(item['label'] + 1, item['text']) for item in ds['train']]
     test_data  = [(item['label'] + 1, item['text']) for item in ds['test']]
@@ -76,23 +77,39 @@ def _collate_batch(batch, vocab, max_len):
     return padded, segments, label_tensor
 
 
-def get_dataloaders(config):
+def get_dataloaders(config, vocab=None, val_fraction=0.05, seed=42):
+    """
+    Returns (train_loader, val_loader, test_loader, vocab).
+
+    A held-out validation split is carved from the training data so the SA
+    search and per-epoch monitoring never score on training examples. Pass a
+    pre-built `vocab` (e.g. one restored from a checkpoint) to skip rebuilding
+    it from the training texts.
+    """
     batch_size = config['batch_size']
     max_len    = config['max_len']
     max_tokens = config.get('vocab_size', 30000)
 
-    print("Downloading AG_NEWS dataset...")
+    print("Loading AG_NEWS dataset...")
     train_data, test_data = _load_ag_news()
 
-    print("Building vocabulary...")
-    vocab = build_vocab([text for _, text in train_data], max_tokens=max_tokens)
+    random.Random(seed).shuffle(train_data)
+    n_val = int(len(train_data) * val_fraction)
+    val_data, train_data = train_data[:n_val], train_data[n_val:]
+
+    if vocab is None:
+        print("Building vocabulary...")
+        vocab = build_vocab([text for _, text in train_data], max_tokens=max_tokens)
 
     collate_fn = partial(_collate_batch, vocab=vocab, max_len=max_len)
 
     train_loader = DataLoader(
         train_data, batch_size=batch_size, shuffle=True,  collate_fn=collate_fn
     )
+    val_loader = DataLoader(
+        val_data,   batch_size=batch_size, shuffle=False, collate_fn=collate_fn
+    )
     test_loader = DataLoader(
         test_data,  batch_size=batch_size, shuffle=False, collate_fn=collate_fn
     )
-    return train_loader, test_loader, vocab
+    return train_loader, val_loader, test_loader, vocab
