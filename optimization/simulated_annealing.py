@@ -91,19 +91,30 @@ def simulated_annealing(cost_function, initial_config, temperature, cooling_rate
     Minimise cost_function over the SA-optimizable hyperparameters.
 
     Extra keyword arguments are forwarded to cost_function on every call,
-    e.g. train_loader=..., device=..., n_eval_batches=...
+    e.g. train_loader=..., device=..., n_train_batches=...
+
+    Returns (best_config, history), where history is a list of dicts, one per
+    evaluated candidate.
     """
     current_config = initial_config.copy()
     current_cost = cost_function(current_config, **kwargs)
     best_config = current_config.copy()
     best_cost = current_cost
 
+    # One row per evaluated candidate (iteration 0 is the initial config),
+    # so the search trajectory can be saved and plotted afterwards.
+    history = [_history_row(0, temperature, current_config, current_cost,
+                            True, current_cost, best_cost)]
+
     for iteration in range(max_iterations):
         new_config = make_random_perturbation(current_config)
         new_cost = cost_function(new_config, **kwargs)
         delta_cost = new_cost - current_cost
 
-        if delta_cost < 0 or random.random() < math.exp(-delta_cost / temperature):
+        # Temperature used for this acceptance decision, before cooling
+        step_temp = temperature
+        accepted = delta_cost < 0 or random.random() < math.exp(-delta_cost / temperature)
+        if accepted:
             current_config = new_config
             current_cost = new_cost
 
@@ -111,10 +122,27 @@ def simulated_annealing(cost_function, initial_config, temperature, cooling_rate
                 best_config = current_config.copy()
                 best_cost = current_cost
 
+        history.append(_history_row(iteration + 1, step_temp, new_config, new_cost,
+                                    accepted, current_cost, best_cost))
         temperature *= cooling_rate
         print(
-            f"SA iter {iteration + 1:3d}: cost={current_cost:.4f}  "
-            f"best={best_cost:.4f}  temp={temperature:.4f}"
+            f"SA iter {iteration + 1:3d}: candidate={new_cost:.4f} "
+            f"({'accepted' if accepted else 'rejected'})  cost={current_cost:.4f}  "
+            f"best={best_cost:.4f}  temp={step_temp:.4f}"
         )
 
-    return best_config
+    return best_config, history
+
+
+def _history_row(iteration, temperature, config, cost, accepted, current_cost, best_cost):
+    return {
+        'iteration': iteration,
+        'temperature': temperature,
+        'learning_rate': config['learning_rate'],
+        'dropout': config['dropout'],
+        'n_layers': config['n_layers'],
+        'candidate_cost': cost,
+        'accepted': accepted,
+        'current_cost': current_cost,
+        'best_cost': best_cost,
+    }

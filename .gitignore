@@ -3,3 +3,4 @@ __pycache__/
 model.pt
 data/
 .claude/settings.local.json
+sa_log.csv

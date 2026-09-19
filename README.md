@@ -1,6 +1,8 @@
 # BERT BoSA
 ### Bidirectional Encoder Representations from Transformers using Boltzmann Simulated Annealing
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/jeorgexyz/BERT-BoSA/blob/main/BERT_BoSA_Colab.ipynb)
+
 BERT BoSA trains a BERT-style transformer encoder from scratch for text classification, using Simulated Annealing to search over training hyperparameters. The SA search perturbs the **learning rate**, **dropout rate**, and **number of encoder layers**, scoring each candidate by training a fresh model for a fixed number of batches and measuring its accuracy on a held-out validation split. The best configuration found is then used for the full training run.
 
 Note that this is the BERT *architecture* trained directly on the classification task — there is no masked-language-model pretraining — so expect from-scratch accuracy rather than pretrained-BERT numbers. For context, simple bag-of-embeddings baselines reach about 92% on AG_NEWS; this repo exists to demonstrate SA-driven hyperparameter search, not to beat them.
@@ -10,6 +12,7 @@ Note that this is the BERT *architecture* trained directly on the classification
 - Python 3.8 or later
 - PyTorch
 - HuggingFace `datasets` (for AG_NEWS)
+- matplotlib (only for `plot_sa.py`)
 
 Install with:
 
@@ -36,6 +39,8 @@ BERT-BoSA/
 ├── config.py                    # initial + fixed hyperparameters
 ├── train.py                     # SA search, full training, checkpointing
 ├── eval.py                      # test-set evaluation of a checkpoint
+├── plot_sa.py                   # plots the SA trace from sa_log.csv
+├── BERT_BoSA_Colab.ipynb        # end-to-end run on a Colab GPU
 ├── requirements.txt
 ├── LICENSE
 └── README.md
@@ -60,6 +65,7 @@ BERT-BoSA/
    --epochs N            epochs for the final training run
    --seed N              random seed (default 42)
    --output PATH         checkpoint path (default model.pt)
+   --sa-log PATH         per-iteration SA trace CSV (default sa_log.csv)
    ```
 
    Each SA iteration trains a candidate model for `--sa-train-batches` batches, so the search cost scales with both flags. Candidate evaluations use a fixed seed so configs are compared under identical initialisation and batch order. The cooling rate is derived from `--sa-iterations` so the temperature always decays from 0.1 to 0.001 over the full run.
@@ -73,6 +79,16 @@ BERT-BoSA/
    ```
 
    This restores the model and its training vocabulary from the checkpoint and reports accuracy on the AG_NEWS test set.
+
+4. **Plotting the search**:
+
+   ```
+   python plot_sa.py --log sa_log.csv --output sa_trace.png
+   ```
+
+   Plots validation accuracy of each candidate (accepted vs. rejected), the current and best-so-far configs, and the temperature schedule.
+
+**No GPU?** Use the Colab badge at the top — the notebook runs all of the above on a free Colab GPU and lets you download the plot and logs.
 
 ## Customization
 

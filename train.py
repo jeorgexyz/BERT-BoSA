@@ -1,4 +1,5 @@
 import argparse
+import csv
 import random
 
 import torch
@@ -51,6 +52,8 @@ def parse_args():
                         help='skip the SA search and train with the initial config')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--output', default='model.pt', help='checkpoint path')
+    parser.add_argument('--sa-log', default='sa_log.csv',
+                        help='CSV file for the per-iteration SA trace (see plot_sa.py)')
     return parser.parse_args()
 
 
@@ -77,12 +80,16 @@ def main():
         # Run Simulated Annealing to find the best hyperparameter config.
         # Cost is 1 - val_accuracy, so temperature is on the accuracy scale:
         # 0.1 initially accepts ~5-point accuracy regressions with p≈0.6.
+        # The cooling rate is derived so the temperature decays from 0.1 to
+        # 0.001 over however many iterations were requested.
+        start_temp, final_temp = 0.1, 0.001
+        cooling_rate = (final_temp / start_temp) ** (1 / max(args.sa_iterations, 1))
         print("Running Simulated Annealing to optimise configuration...")
-        best_config = simulated_annealing(
+        best_config, history = simulated_annealing(
             evaluate_bert_model,
             config,
-            temperature=0.1,
-            cooling_rate=0.85,
+            temperature=start_temp,
+            cooling_rate=cooling_rate,
             max_iterations=args.sa_iterations,
             train_loader=train_loader,
             val_loader=val_loader,
@@ -91,6 +98,12 @@ def main():
             seed=args.seed,
         )
         print(f"\nBest config: {best_config}\n")
+
+        with open(args.sa_log, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=list(history[0].keys()))
+            writer.writeheader()
+            writer.writerows(history)
+        print(f"Saved SA trace to {args.sa_log}")
 
     # Full training with the best config
     print("Training with best config...")
