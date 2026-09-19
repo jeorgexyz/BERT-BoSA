@@ -46,7 +46,7 @@ def parse_args():
                         help='epochs for the final full training run')
     parser.add_argument('--sa-iterations', type=int, default=15,
                         help='simulated annealing iterations')
-    parser.add_argument('--sa-train-batches', type=int, default=100,
+    parser.add_argument('--sa-train-batches', type=int, default=300,
                         help='training batches per SA candidate evaluation')
     parser.add_argument('--skip-sa', action='store_true',
                         help='skip the SA search and train with the initial config')
@@ -78,8 +78,8 @@ def main():
         best_config = config
     else:
         # Run Simulated Annealing to find the best hyperparameter config.
-        # Cost is 1 - val_accuracy, so temperature is on the accuracy scale:
-        # 0.1 initially accepts ~5-point accuracy regressions with p≈0.6.
+        # Cost is validation cross-entropy, so temperature is on the loss
+        # scale: 0.1 initially accepts a 0.05 loss regression with p≈0.6.
         # The cooling rate is derived so the temperature decays from 0.1 to
         # 0.001 over however many iterations were requested.
         start_temp, final_temp = 0.1, 0.001

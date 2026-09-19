@@ -3,7 +3,7 @@
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/jeorgexyz/BERT-BoSA/blob/main/BERT_BoSA_Colab.ipynb)
 
-BERT BoSA trains a BERT-style transformer encoder from scratch for text classification, using Simulated Annealing to search over training hyperparameters. The SA search perturbs the **learning rate**, **dropout rate**, and **number of encoder layers**, scoring each candidate by training a fresh model for a fixed number of batches and measuring its accuracy on a held-out validation split. The best configuration found is then used for the full training run.
+BERT BoSA trains a BERT-style transformer encoder from scratch for text classification, using Simulated Annealing to search over training hyperparameters. The SA search perturbs the **learning rate**, **dropout rate**, and **number of encoder layers**, scoring each candidate by training a fresh model for a fixed number of batches and measuring its cross-entropy loss on a held-out validation split. The best configuration found is then used for the full training run.
 
 Note that this is the BERT *architecture* trained directly on the classification task — there is no masked-language-model pretraining — so expect from-scratch accuracy rather than pretrained-BERT numbers. For context, simple bag-of-embeddings baselines reach about 92% on AG_NEWS; this repo exists to demonstrate SA-driven hyperparameter search, not to beat them.
 
@@ -60,7 +60,7 @@ BERT-BoSA/
 
    ```
    --sa-iterations N     SA iterations (default 15)
-   --sa-train-batches N  training batches per SA candidate (default 100)
+   --sa-train-batches N  training batches per SA candidate (default 300)
    --skip-sa             skip the search and train with the initial config
    --epochs N            epochs for the final training run
    --seed N              random seed (default 42)
@@ -98,11 +98,14 @@ BERT-BoSA/
 
 ## How the search works
 
-Each SA step perturbs one hyperparameter (learning rate ×[0.5, 2] clamped to [1e-5, 1e-3]; dropout ±0.1 clamped to [0, 0.5]; layers ±2 clamped to [1, 16]) and scores the candidate as `cost = 1 − val_accuracy`. A better candidate is always accepted; a worse one is accepted with the Boltzmann/Metropolis probability `exp(−Δcost / T)` — the "Boltzmann" in the name. Because cost is on the accuracy scale, a starting temperature of 0.1 accepts a 5-point accuracy drop with probability ≈ 0.6, letting the search escape local optima early and becoming greedy as `T` cools.
+Each SA step perturbs one hyperparameter (learning rate ×[0.5, 2] clamped to [1e-5, 1e-3]; dropout ±0.1 clamped to [0, 0.5]; layers ±2 clamped to [1, 16]) and scores the candidate by its validation cross-entropy. A better candidate is always accepted; a worse one is accepted with the Boltzmann/Metropolis probability `exp(−Δcost / T)` — the "Boltzmann" in the name. A starting temperature of 0.1 accepts a 0.05 loss regression with probability ≈ 0.6, letting the search escape local optima early and becoming greedy as `T` cools.
+
+**Why loss and not accuracy?** Accuracy is too coarse a ruler for weakly-trained models. With a 100-batch budget every candidate still predicts a single class and scores exactly chance (0.2556 on AG_NEWS), so an accuracy-based cost is *identical* for every config, every candidate is accepted, and the search degenerates into a random walk. Validation loss separates candidates immediately. The trace CSV records accuracy too, for reference.
 
 ## Known limitations
 
 - **Short-horizon bias**: candidates are scored after only `--sa-train-batches` steps, which favours configs that learn fast (shallower models, higher learning rates) over those that would win with full training.
+- **The search budget must be large enough to separate configs.** Too few batches and every candidate sits at chance accuracy with near-identical loss; the accepted/rejected pattern in the plot is the quickest way to spot this.
 - **Segment embeddings** are included for fidelity to BERT but are always zero, since classification inputs are single sentences.
 - **Head dropout** is fixed at 0.1 and is not part of the SA search space.
 - **No pretraining, warmup, or LR schedule** — deliberate, to keep the code small and focused on the search.

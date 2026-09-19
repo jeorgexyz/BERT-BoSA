@@ -4,3 +4,5 @@ model.pt
 data/
 .claude/settings.local.json
 sa_log.csv
+train_log.txt
+eval_log.txt

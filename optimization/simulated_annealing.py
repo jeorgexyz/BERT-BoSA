@@ -6,7 +6,7 @@ import torch.nn as nn
 
 from models.bert import BERT
 from models.classification_head import ClassificationHead
-from utils.train_utils import compute_accuracy
+from utils.train_utils import evaluate_model
 
 
 def make_random_perturbation(config):
@@ -32,7 +32,13 @@ def evaluate_bert_model(config, train_loader, val_loader, device,
                         n_train_batches=100, n_val_batches=50, seed=42):
     """
     Train a fresh BERT model for n_train_batches steps, then score it on
-    held-out validation batches. Returns 1 - val_accuracy (SA minimises cost).
+    held-out validation batches. Returns (val_loss, val_accuracy); SA
+    minimises the loss.
+
+    Loss, not 1 - accuracy, is the cost: within a short search budget every
+    candidate still predicts a single class and scores exactly chance, so an
+    accuracy-based cost is identical for every config and the search
+    degenerates into a random walk. Loss separates them immediately.
 
     The seed is fixed so every candidate config sees the same initialisation
     and batch order — otherwise run-to-run noise swamps the differences
@@ -82,8 +88,7 @@ def evaluate_bert_model(config, train_loader, val_loader, device,
         optimizer.step()
         n_batches += 1
 
-    val_acc = compute_accuracy(bert, head, val_loader, device, max_batches=n_val_batches)
-    return 1.0 - val_acc
+    return evaluate_model(bert, head, val_loader, device, max_batches=n_val_batches)
 
 
 def simulated_annealing(cost_function, initial_config, temperature, cooling_rate, max_iterations, **kwargs):
@@ -97,18 +102,18 @@ def simulated_annealing(cost_function, initial_config, temperature, cooling_rate
     evaluated candidate.
     """
     current_config = initial_config.copy()
-    current_cost = cost_function(current_config, **kwargs)
+    current_cost, current_acc = cost_function(current_config, **kwargs)
     best_config = current_config.copy()
     best_cost = current_cost
 
     # One row per evaluated candidate (iteration 0 is the initial config),
     # so the search trajectory can be saved and plotted afterwards.
     history = [_history_row(0, temperature, current_config, current_cost,
-                            True, current_cost, best_cost)]
+                            current_acc, True, current_cost, best_cost)]
 
     for iteration in range(max_iterations):
         new_config = make_random_perturbation(current_config)
-        new_cost = cost_function(new_config, **kwargs)
+        new_cost, new_acc = cost_function(new_config, **kwargs)
         delta_cost = new_cost - current_cost
 
         # Temperature used for this acceptance decision, before cooling
@@ -123,18 +128,19 @@ def simulated_annealing(cost_function, initial_config, temperature, cooling_rate
                 best_cost = current_cost
 
         history.append(_history_row(iteration + 1, step_temp, new_config, new_cost,
-                                    accepted, current_cost, best_cost))
+                                    new_acc, accepted, current_cost, best_cost))
         temperature *= cooling_rate
         print(
-            f"SA iter {iteration + 1:3d}: candidate={new_cost:.4f} "
-            f"({'accepted' if accepted else 'rejected'})  cost={current_cost:.4f}  "
-            f"best={best_cost:.4f}  temp={step_temp:.4f}"
+            f"SA iter {iteration + 1:3d}: candidate loss={new_cost:.4f} "
+            f"acc={new_acc:.4f} ({'accepted' if accepted else 'rejected'})  "
+            f"cost={current_cost:.4f}  best={best_cost:.4f}  temp={step_temp:.4f}"
         )
 
     return best_config, history
 
 
-def _history_row(iteration, temperature, config, cost, accepted, current_cost, best_cost):
+def _history_row(iteration, temperature, config, cost, accuracy, accepted,
+                 current_cost, best_cost):
     return {
         'iteration': iteration,
         'temperature': temperature,
@@ -142,6 +148,7 @@ def _history_row(iteration, temperature, config, cost, accepted, current_cost, b
         'dropout': config['dropout'],
         'n_layers': config['n_layers'],
         'candidate_cost': cost,
+        'candidate_accuracy': accuracy,
         'accepted': accepted,
         'current_cost': current_cost,
         'best_cost': best_cost,

@@ -21,7 +21,8 @@ def load_trace(path):
     for r in rows:
         r['iteration'] = int(r['iteration'])
         r['accepted'] = r['accepted'] == 'True'
-        for k in ('temperature', 'candidate_cost', 'current_cost', 'best_cost'):
+        for k in ('temperature', 'candidate_cost', 'candidate_accuracy',
+                  'current_cost', 'best_cost'):
             r[k] = float(r[k])
     return rows
 
@@ -39,10 +40,9 @@ def style_axis(ax):
 
 def plot(rows, output):
     it = [r['iteration'] for r in rows]
-    # Plot accuracy (1 - cost) rather than cost: easier to read
-    cand = [1 - r['candidate_cost'] for r in rows]
-    current = [1 - r['current_cost'] for r in rows]
-    best = [1 - r['best_cost'] for r in rows]
+    cand = [r['candidate_cost'] for r in rows]
+    current = [r['current_cost'] for r in rows]
+    best = [r['best_cost'] for r in rows]
     temp = [r['temperature'] for r in rows]
 
     fig, (ax_acc, ax_temp) = plt.subplots(
@@ -73,8 +73,9 @@ def plot(rows, output):
         ax_acc.text(x_end, current[-1], 'current', color=INK_SECONDARY, fontsize=9, va='center')
         ax_acc.text(x_end, best[-1], 'best', color=INK_SECONDARY, fontsize=9, va='center')
 
-    ax_acc.set_ylabel('validation accuracy', color=INK_SECONDARY, fontsize=10)
-    ax_acc.set_title('Simulated annealing search', loc='left', color=INK, fontsize=12, pad=30)
+    ax_acc.set_ylabel('validation loss (SA cost)', color=INK_SECONDARY, fontsize=10)
+    ax_acc.set_title('Simulated annealing search  (lower is better)', loc='left',
+                     color=INK, fontsize=12, pad=30)
     # Legend in a row above the plot so it never covers data
     ax_acc.legend(loc='lower left', bbox_to_anchor=(0, 1.0), ncol=4, frameon=False,
                   fontsize=9, labelcolor=INK_SECONDARY, handletextpad=0.4, columnspacing=1.2)
