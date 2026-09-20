@@ -14,11 +14,16 @@ Note that this is the BERT *architecture* trained directly on the classification
 - HuggingFace `datasets` (for AG_NEWS)
 - matplotlib (only for `plot_sa.py`)
 
-Install with:
+Install into a virtual environment so the project doesn't share packages with your system Python:
 
 ```
+python -m venv .venv
+.venv\Scriptsctivate        # Windows
+source .venv/bin/activate     # macOS / Linux
 pip install -r requirements.txt
 ```
+
+The CPU build of PyTorch installs by default. For a CUDA build, follow the selector at [pytorch.org](https://pytorch.org/get-started/locally/).
 
 ## Dataset
 

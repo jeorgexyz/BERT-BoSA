@@ -7,3 +7,4 @@ data/
 /train_log.txt
 /eval_log.txt
 /sa_trace.png
+.venv/
