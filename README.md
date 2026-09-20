@@ -40,6 +40,7 @@ BERT-BoSA/
 ├── train.py                     # SA search, full training, checkpointing
 ├── eval.py                      # test-set evaluation of a checkpoint
 ├── plot_sa.py                   # plots the SA trace from sa_log.csv
+├── docs/                        # sample run: trace CSV + plot
 ├── BERT_BoSA_Colab.ipynb        # end-to-end run on a Colab GPU
 ├── requirements.txt
 ├── LICENSE
@@ -89,6 +90,32 @@ BERT-BoSA/
    Plots validation accuracy of each candidate (accepted vs. rejected), the current and best-so-far configs, and the temperature schedule.
 
 **No GPU?** Use the Colab badge at the top — the notebook runs all of the above on a free Colab GPU and lets you download the plot and logs.
+
+## Results
+
+A full run on a Colab T4 (15 SA iterations × 300 batches per candidate, then 3 epochs on the winner):
+
+![Simulated annealing search](docs/sa_trace.png)
+
+The search drops validation loss from 1.43 to 0.98 (candidate accuracy 26% → 60%). Note iterations 5–6: uphill moves accepted while the temperature is still high, exactly what SA is supposed to do. Rejections cluster later, as `T` cools and the search turns greedy. The full trace is in [`docs/sa_log.csv`](docs/sa_log.csv).
+
+```
+SA iter   4: candidate loss=1.0472 acc=0.5656 (accepted)  cost=1.0472  best=1.0472  temp=0.0398
+SA iter   5: candidate loss=1.1386 acc=0.5506 (accepted)  cost=1.1386  best=1.0472  temp=0.0293
+...
+SA iter  13: candidate loss=0.9929 acc=0.6200 (accepted)  cost=0.9929  best=0.9929  temp=0.0025
+SA iter  14: candidate loss=0.9803 acc=0.6044 (accepted)  cost=0.9803  best=0.9803  temp=0.0018
+SA iter  15: candidate loss=1.1124 acc=0.5375 (rejected)  cost=0.9803  best=0.9803  temp=0.0014
+
+Best config: learning_rate=7.37e-05, dropout=0.168, n_layers=5
+
+Epoch 1/3  loss=0.6357  train_acc=0.7529  val_acc=0.8667
+Epoch 2/3  loss=0.4118  train_acc=0.8566  val_acc=0.8808
+Epoch 3/3  loss=0.3570  train_acc=0.8762  val_acc=0.8783
+Test Accuracy: 0.8734
+```
+
+**The honest result: the searched config did slightly worse than the starting one.** SA picked a 5-layer model (87.34% test accuracy); the untuned 8-layer default reached 88.08% in an earlier run. This is short-horizon bias in action — 300 batches rewards the model that learns *fastest*, not the one that ends up best after three full epochs. Lengthening the candidate budget, or ranking finalists with a longer run, is the standard fix, and it costs proportionally more search time. The search is doing its job correctly; the objective it is given is simply an imperfect proxy for the one you care about.
 
 ## Customization
 
