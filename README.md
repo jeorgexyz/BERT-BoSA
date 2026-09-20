@@ -18,7 +18,7 @@ Install into a virtual environment so the project doesn't share packages with yo
 
 ```
 python -m venv .venv
-.venv\Scriptsctivate        # Windows
+.venv\Scripts\activate        # Windows
 source .venv/bin/activate     # macOS / Linux
 pip install -r requirements.txt
 ```
