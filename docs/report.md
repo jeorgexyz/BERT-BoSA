@@ -1,6 +1,7 @@
 # When Simulated Annealing Selects a Fast Learner Instead of the Best Final Model
 
 **Jeorge D. Anderson II**
+Independent research
 [github.com/jeorgexyz](https://github.com/jeorgexyz) · [BERT-BoSA](https://github.com/jeorgexyz/BERT-BoSA)
 September 19, 2026
 
