@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BERT-BoSA</title>
+<meta name="description" content="Simulated annealing for hyperparameter search on a from-scratch BERT classifier: when the search optimises early training progress instead of final accuracy.">
+
+<meta property="og:title" content="When Simulated Annealing Selects a Fast Learner Instead of the Best Final Model">
+<meta property="og:description" content="Simulated annealing cut short-run validation loss by 31%, then lost to the untuned baseline by 0.74 points on the test set.">
+<meta property="og:type" content="article">
+<meta property="og:image" content="https://jeorgexyz.github.io/BERT-BoSA/sa_trace.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script>
+  window.MathJax = {
+    tex: {inlineMath: [['$', '$']], displayMath: [['$$', '$$']]},
+    options: {skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']}
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" id="MathJax-script" async></script>
+
+<style>
+:root {
+  --surface:        #fcfcfb;
+  --surface-sunken: #f4f3ef;
+  --border:         #e3e2dc;
+  --ink:            #0b0b0b;
+  --ink-secondary:  #52514e;
+  --ink-muted:      #898781;
+  --accent:         #1c5cab;
+  --accent-bright:  #2a78d6;
+  --highlight:      #eb6834;
+  --serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: 'SF Mono', 'Consolas', 'Liberation Mono', monospace;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 18px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 800px; margin: 0 auto; padding: 0 16px; }
+
+/* ---------- hero ---------- */
+header {
+  padding: 72px 0 40px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+
+h1 {
+  font-size: clamp(1.9rem, 5vw, 2.7rem);
+  line-height: 1.18;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin: 0 0 28px;
+  text-wrap: balance;
+}
+
+.authors {
+  font-family: var(--sans);
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.affiliation, .date {
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  color: var(--ink-secondary);
+  margin: 0;
+}
+
+.date { color: var(--ink-muted); margin-top: 4px; }
+
+/* ---------- link buttons ---------- */
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin: 30px 0 0;
+}
+
+.links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-family: var(--sans);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+
+.links a:hover { background: #2f2e2b; transform: translateY(-1px); }
+.links a svg { width: 16px; height: 16px; fill: currentColor; flex-shrink: 0; }
+
+/* ---------- sections ---------- */
+main { padding-bottom: 72px; }
+
+section { padding-top: 48px; }
+
+h2 {
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin: 0 0 18px;
+}
+
+h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 32px 0 10px;
+}
+
+p { margin: 0 0 18px; }
+
+a { color: var(--accent); }
+
+strong { font-weight: 600; }
+
+figure { margin: 0; }
+
+figure img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+figcaption {
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--ink-secondary);
+  margin-top: 12px;
+}
+
+/* ---------- headline numbers ---------- */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 2px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 28px 0 0;
+}
+
+.stat { background: var(--surface); padding: 20px 22px; }
+
+.stat .value {
+  font-family: var(--sans);
+  font-size: 1.7rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  display: block;
+}
+
+.stat .label {
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--ink-secondary);
+  display: block;
+  margin-top: 6px;
+}
+
+.stat.down .value { color: var(--accent-bright); }
+.stat.flat .value { color: var(--highlight); }
+
+/* ---------- table ---------- */
+.table-scroll { overflow-x: auto; margin: 0 0 18px; }
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 0.88rem;
+}
+
+th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: right; }
+th:first-child, td:first-child { text-align: left; }
+
+thead th {
+  font-weight: 600;
+  color: var(--ink-secondary);
+  border-bottom: 2px solid var(--ink);
+  vertical-align: bottom;
+}
+
+tbody tr:last-child td { border-bottom: none; }
+
+/* ---------- code ---------- */
+pre {
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 18px;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  margin: 0 0 18px;
+}
+
+code { font-family: var(--mono); font-size: 0.88em; }
+
+p code, li code {
+  background: var(--surface-sunken);
+  padding: 0.12em 0.35em;
+  border-radius: 4px;
+}
+
+/* ---------- callout ---------- */
+.callout {
+  border-left: 3px solid var(--highlight);
+  background: var(--surface-sunken);
+  border-radius: 0 8px 8px 0;
+  padding: 18px 22px;
+  margin: 0 0 18px;
+}
+
+.callout p:last-child { margin-bottom: 0; }
+
+ul { margin: 0 0 18px; padding-left: 22px; }
+li { margin-bottom: 8px; }
+
+/* ---------- footer ---------- */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 28px 0 56px;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+  text-align: center;
+}
+
+footer a { color: var(--ink-secondary); }
+
+mjx-container { overflow-x: auto; overflow-y: hidden; }
+
+@media (max-width: 600px) {
+  body { font-size: 17px; }
+  header { padding: 48px 0 32px; }
+  section { padding-top: 38px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>When Simulated Annealing Selects a Fast Learner Instead of the Best Final Model</h1>
+    <p class="authors">Jeorge D. Anderson II</p>
+    <p class="affiliation">Independent research</p>
+    <p class="date">September 19, 2026</p>
+
+    <nav class="links">
+      <a href="report.pdf">
+        <svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15a0 0 0 0 1 0 0H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm8 1.5V8h4.5L14 3.5zM8 13h8v1.5H8V13zm0 3.5h8V18H8v-1.5zM8 9.5h4V11H8V9.5z"/></svg>
+        Report (PDF)
+      </a>
+      <a href="https://github.com/jeorgexyz/BERT-BoSA">
+        <svg viewBox="0 0 24 24"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.8 10.9.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.1.1 1.7 1.2 1.7 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0C17.4 5.2 18.4 5.5 18.4 5.5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6 4.6-1.5 7.8-5.8 7.8-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
+        Code
+      </a>
+      <a href="https://colab.research.google.com/github/jeorgexyz/BERT-BoSA/blob/main/BERT_BoSA_Colab.ipynb">
+        <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 4.5a5.5 5.5 0 0 1 4.2 9.04l-2.2-1.86A2.6 2.6 0 1 0 12 17.5a5.5 5.5 0 0 1 0-11z"/></svg>
+        Run on Colab
+      </a>
+      <a href="sa_log.csv">
+        <svg viewBox="0 0 24 24"><path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>
+        Search trace
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section id="teaser">
+    <figure>
+      <img src="sa_trace.png" alt="Two stacked charts. The upper chart plots validation loss for each search candidate, with lines for the current and best configurations descending from 1.43 to 0.98 in steps; accepted candidates are filled dots and rejected ones hollow. The lower chart shows temperature decaying geometrically from 0.1 toward zero.">
+      <figcaption>
+        The search trajectory. Each dot is a candidate model trained for 300 batches; filled dots were accepted, hollow ones rejected. Note iterations 5 and 6, where worse candidates are accepted while the temperature is still high &mdash; the behaviour that distinguishes annealing from greedy search. Rejections cluster later, as cooling makes the search greedy.
+      </figcaption>
+    </figure>
+
+    <div class="stats">
+      <div class="stat down">
+        <span class="value">1.43 &rarr; 0.98</span>
+        <span class="label">Validation loss over the search, a 31% reduction</span>
+      </div>
+      <div class="stat">
+        <span class="value">87.34%</span>
+        <span class="label">Test accuracy of the selected 5-layer config</span>
+      </div>
+      <div class="stat flat">
+        <span class="value">88.08%</span>
+        <span class="label">Test accuracy of the untuned 8-layer baseline</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="abstract">
+    <h2>Abstract</h2>
+    <p>This project tests simulated annealing as a way to choose training hyperparameters for a BERT-style text classifier trained from scratch on AG_NEWS. The search changes learning rate, encoder dropout, and encoder depth. Each candidate trains for 300 batches and is ranked by validation cross-entropy loss. In the recorded run, the best candidate reduced this short-run loss from 1.4264 for the starting configuration to 0.9803. After three full training epochs, the selected configuration achieved 87.34% test accuracy, compared with 88.08% for the starting configuration in an earlier run made with a previous version of the search code. This result is consistent with a mismatch between the short search budget and the final training objective: a model that improves quickly may not finish strongest. Because the comparison uses single runs whose random-number state is not matched, it should be treated as a case study rather than a general conclusion about simulated annealing.</p>
+  </section>
+
+  <section id="method">
+    <h2>How the search works</h2>
+    <p>Each step perturbs one hyperparameter &mdash; learning rate (&times;[0.5, 2], clamped to [1e-5, 1e-3]), encoder dropout (&plusmn;0.1, clamped to [0, 0.5]), or layer count (&plusmn;2, clamped to [1, 16]). A fresh model trains for 300 batches under the candidate configuration and is scored by cross-entropy on held-out validation batches. A lower-loss candidate is always accepted; a higher-loss one is accepted with the Boltzmann probability</p>
+
+    <p>$$P(\text{accept}) = \exp\left(-\frac{L_{\text{candidate}} - L_{\text{current}}}{T}\right),$$</p>
+
+    <p>which is where the <em>Boltzmann</em> in BoSA comes from. Cooling is geometric, with the rate derived from the iteration count so the temperature falls from 0.1 to 0.001 across the run. Early on, the search can move uphill and escape local optima; as $T$ falls it turns greedy.</p>
+
+    <h3>Why loss, and not accuracy</h3>
+    <p>An earlier version scored candidates by <code>1 &minus; accuracy</code>. Every one of the 16 candidates scored <em>exactly</em> 0.744375 &mdash; chance accuracy for four balanced classes. Within a short budget each model still predicts a single class, so accuracy cannot separate them. Every proposal was then accepted with probability $\exp(0) = 1$ and the search degenerated into a random walk that returned its own starting point. Cross-entropy responds to confidence, so it separates candidates long before accuracy moves off chance. That degenerate trace is kept in the repository as <a href="baseline_accuracy_cost_sa_log.csv">baseline_accuracy_cost_sa_log.csv</a>.</p>
+  </section>
+
+  <section id="results">
+    <h2>Results</h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Configuration</th>
+            <th>Learning rate</th>
+            <th>Dropout</th>
+            <th>Layers</th>
+            <th>Val. loss @ 300 batches</th>
+            <th>Val. acc. @ 300 batches</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Starting configuration</td>
+            <td>0.0001000</td>
+            <td>0.2000</td>
+            <td>8</td>
+            <td>1.4264</td>
+            <td>26.25%</td>
+          </tr>
+          <tr>
+            <td>Best by validation loss (iter. 14)</td>
+            <td>0.0000737</td>
+            <td>0.1681</td>
+            <td>5</td>
+            <td>0.9803</td>
+            <td>60.44%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Those are candidate-evaluation numbers, not final results. Trained for three full epochs, the selected configuration reached <strong>87.34%</strong> test accuracy. The untuned eight-layer starting configuration reached <strong>88.08%</strong> in an earlier run.</p>
+
+    <div class="callout">
+      <p><strong>The search succeeded at its stated task and still lost.</strong> It found a configuration with substantially lower loss after 300 batches, and that configuration finished 0.74 points behind the baseline after full training. A five-layer encoder makes faster early progress; a deeper one benefits more from longer training. The search optimised early progress because that is what it was asked to measure.</p>
+    </div>
+  </section>
+
+  <section id="limitations">
+    <h2>What this does not show</h2>
+    <ul>
+      <li>Both final numbers come from <strong>single runs with no seed variation</strong>. A 0.74-point gap is well within the range seeds alone could produce.</li>
+      <li>The two runs were produced by <strong>different versions of the search code</strong>, and their random-number state entering final training is not matched, so initialization and batch order differ.</li>
+      <li>Short-horizon bias is a <em>plausible explanation</em> consistent with the evidence, not something these runs establish on their own.</li>
+    </ul>
+    <p>The follow-up that would settle it: train both configurations for the full three epochs across several seeds on an identical split, and report mean and spread. To test the short-horizon explanation directly, score candidates at several budgets &mdash; 300 batches, one epoch, three epochs &mdash; and measure how well each budget's ranking predicts final accuracy.</p>
+  </section>
+
+  <section id="reproduce">
+    <h2>Reproduce</h2>
+    <p>The <a href="https://colab.research.google.com/github/jeorgexyz/BERT-BoSA/blob/main/BERT_BoSA_Colab.ipynb">Colab notebook</a> runs everything end to end on a free GPU. Locally:</p>
+    <pre><code>git clone https://github.com/jeorgexyz/BERT-BoSA.git
+cd BERT-BoSA
+python -m venv .venv &amp;&amp; .venv\Scripts\activate
+pip install -r requirements.txt
+
+python train.py --sa-iterations 15 --sa-train-batches 300 --epochs 3 --seed 42
+python eval.py --checkpoint model.pt
+python plot_sa.py --log sa_log.csv --output sa_trace.png</code></pre>
+    <p>The recorded run used a Colab T4 with Python 3.13. Full method and analysis are in the <a href="report.pdf">report</a> (<a href="report.md">markdown</a>).</p>
+  </section>
+
+  <section id="cite">
+    <h2>Citation</h2>
+    <pre><code>@misc{anderson2026bertbosa,
+  title  = {When Simulated Annealing Selects a Fast Learner Instead of the Best Final Model},
+  author = {Anderson II, Jeorge D.},
+  year   = {2026},
+  note   = {Independent research},
+  url    = {https://github.com/jeorgexyz/BERT-BoSA}
+}</code></pre>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>MIT licensed &middot; <a href="https://github.com/jeorgexyz/BERT-BoSA">github.com/jeorgexyz/BERT-BoSA</a></p>
+  </div>
+</footer>
+
+</body>
+</html>

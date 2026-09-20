@@ -3,6 +3,8 @@
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/jeorgexyz/BERT-BoSA/blob/main/BERT_BoSA_Colab.ipynb)
 
+**[Project page](https://jeorgexyz.github.io/BERT-BoSA/)** · **[Report (PDF)](docs/report.pdf)**
+
 BERT BoSA trains a BERT-style transformer encoder from scratch for text classification, using Simulated Annealing to search over training hyperparameters. The SA search perturbs the **learning rate**, **dropout rate**, and **number of encoder layers**, scoring each candidate by training a fresh model for a fixed number of batches and measuring its cross-entropy loss on a held-out validation split. The best configuration found is then used for the full training run.
 
 Note that this is the BERT *architecture* trained directly on the classification task — there is no masked-language-model pretraining — so expect from-scratch accuracy rather than pretrained-BERT numbers. For context, simple bag-of-embeddings baselines reach about 92% on AG_NEWS; this repo exists to demonstrate SA-driven hyperparameter search, not to beat them.
@@ -45,7 +47,8 @@ BERT-BoSA/
 ├── train.py                     # SA search, full training, checkpointing
 ├── eval.py                      # test-set evaluation of a checkpoint
 ├── plot_sa.py                   # plots the SA trace from sa_log.csv
-├── docs/                        # write-up, trace CSVs, plot, baseline log
+├── docs/                        # project page, write-up (md + pdf), traces, plot
+├── scripts/build_report_pdf.py  # renders report.md to report.pdf via Chrome
 ├── BERT_BoSA_Colab.ipynb        # end-to-end run on a Colab GPU
 ├── requirements.txt
 ├── LICENSE
@@ -102,7 +105,7 @@ A full run on a Colab T4 (15 SA iterations × 300 batches per candidate, then 3 
 
 ![Simulated annealing search](docs/sa_trace.png)
 
-The search drops validation loss from 1.43 to 0.98 (candidate accuracy 26% → 60%). Note iterations 5–6: uphill moves accepted while the temperature is still high, exactly what SA is supposed to do. Rejections cluster later, as `T` cools and the search turns greedy. The full trace is in [`docs/sa_log.csv`](docs/sa_log.csv), and [`docs/report.md`](docs/report.md) writes the run up in full: method, results, and what the numbers do and don't support.
+The search drops validation loss from 1.43 to 0.98 (candidate accuracy 26% → 60%). Note iterations 5–6: uphill moves accepted while the temperature is still high, exactly what SA is supposed to do. Rejections cluster later, as `T` cools and the search turns greedy. The full trace is in [`docs/sa_log.csv`](docs/sa_log.csv), and [`docs/report.md`](docs/report.md) writes the run up in full: method, results, and what the numbers do and don't support ([PDF](docs/report.pdf), [project page](https://jeorgexyz.github.io/BERT-BoSA/)).
 
 ```
 SA iter   4: candidate loss=1.0472 acc=0.5656 (accepted)  cost=1.0472  best=1.0472  temp=0.0398
