@@ -239,17 +239,6 @@ p code, li code {
   border-radius: 4px;
 }
 
-/* ---------- callout ---------- */
-.callout {
-  border-left: 3px solid var(--highlight);
-  background: var(--surface-sunken);
-  border-radius: 0 8px 8px 0;
-  padding: 18px 22px;
-  margin: 0 0 18px;
-}
-
-.callout p:last-child { margin-bottom: 0; }
-
 ul { margin: 0 0 18px; padding-left: 22px; }
 li { margin-bottom: 8px; }
 
@@ -383,13 +372,11 @@ mjx-container { overflow-x: auto; overflow-y: hidden; }
     </div>
     <p>Those are candidate-evaluation numbers, not final results. Trained for three full epochs, the selected configuration reached <strong>87.34%</strong> test accuracy. The untuned eight-layer starting configuration reached <strong>88.08%</strong> in an earlier run.</p>
 
-    <div class="callout">
-      <p><strong>The search succeeded at its stated task and still lost.</strong> It found a configuration with substantially lower loss after 300 batches, and that configuration finished 0.74 points behind the baseline after full training. A five-layer encoder makes faster early progress; a deeper one benefits more from longer training. The search optimised early progress because that is what it was asked to measure.</p>
-    </div>
+    <p><strong>The search succeeded at its stated task and still lost.</strong> It found a configuration with substantially lower loss after 300 batches, and that configuration finished 0.74 points behind the baseline after full training. A five-layer encoder makes faster early progress; a deeper one benefits more from longer training. The search optimised early progress because that is what it was asked to measure.</p>
   </section>
 
   <section id="limitations">
-    <h2>What this does not show</h2>
+    <h2>Limitations</h2>
     <ul>
       <li>Both final numbers come from <strong>single runs with no seed variation</strong>. A 0.74-point gap is well within the range seeds alone could produce.</li>
       <li>The two runs were produced by <strong>different versions of the search code</strong>, and their random-number state entering final training is not matched, so initialization and batch order differ.</li>
