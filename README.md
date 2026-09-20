@@ -45,7 +45,7 @@ BERT-BoSA/
 ├── train.py                     # SA search, full training, checkpointing
 ├── eval.py                      # test-set evaluation of a checkpoint
 ├── plot_sa.py                   # plots the SA trace from sa_log.csv
-├── docs/                        # sample run: trace CSV + plot
+├── docs/                        # write-up, trace CSVs, plot, baseline log
 ├── BERT_BoSA_Colab.ipynb        # end-to-end run on a Colab GPU
 ├── requirements.txt
 ├── LICENSE
@@ -102,7 +102,7 @@ A full run on a Colab T4 (15 SA iterations × 300 batches per candidate, then 3 
 
 ![Simulated annealing search](docs/sa_trace.png)
 
-The search drops validation loss from 1.43 to 0.98 (candidate accuracy 26% → 60%). Note iterations 5–6: uphill moves accepted while the temperature is still high, exactly what SA is supposed to do. Rejections cluster later, as `T` cools and the search turns greedy. The full trace is in [`docs/sa_log.csv`](docs/sa_log.csv).
+The search drops validation loss from 1.43 to 0.98 (candidate accuracy 26% → 60%). Note iterations 5–6: uphill moves accepted while the temperature is still high, exactly what SA is supposed to do. Rejections cluster later, as `T` cools and the search turns greedy. The full trace is in [`docs/sa_log.csv`](docs/sa_log.csv), and [`docs/report.md`](docs/report.md) writes the run up in full: method, results, and what the numbers do and don't support.
 
 ```
 SA iter   4: candidate loss=1.0472 acc=0.5656 (accepted)  cost=1.0472  best=1.0472  temp=0.0398

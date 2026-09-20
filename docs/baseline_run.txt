@@ -1,0 +1,33 @@
+# Baseline run (accuracy-based SA cost, commit 7be4018)
+# train.py defaults at the time: --sa-iterations 15 --sa-train-batches 100 --epochs 3 --seed 42
+
+Using device: cuda
+Loading data...
+Loading AG_NEWS dataset...
+Building vocabulary...
+Vocab size: 30000
+Running Simulated Annealing to optimise configuration...
+SA iter   1: candidate=0.7444 (accepted)  cost=0.7444  best=0.7444  temp=0.1000
+SA iter   2: candidate=0.7444 (accepted)  cost=0.7444  best=0.7444  temp=0.0736
+SA iter   3: candidate=0.7444 (accepted)  cost=0.7444  best=0.7444  temp=0.0541
+SA iter   4: candidate=0.7444 (accepted)  cost=0.7444  best=0.7444  temp=0.0398
+SA iter   5: candidate=0.7444 (accepted)  cost=0.7444  best=0.7444  temp=0.0293
+SA iter   6: candidate=0.7444 (accepted)  cost=0.7444  best=0.7444  temp=0.0215
+SA iter   7: candidate=0.7444 (accepted)  cost=0.7444  best=0.7444  temp=0.0158
+SA iter   8: candidate=0.7444 (accepted)  cost=0.7444  best=0.7444  temp=0.0117
+SA iter   9: candidate=0.7444 (accepted)  cost=0.7444  best=0.7444  temp=0.0086
+SA iter  10: candidate=0.7444 (accepted)  cost=0.7444  best=0.7444  temp=0.0063
+SA iter  11: candidate=0.7444 (accepted)  cost=0.7444  best=0.7444  temp=0.0046
+SA iter  12: candidate=0.7444 (accepted)  cost=0.7444  best=0.7444  temp=0.0034
+SA iter  13: candidate=0.7444 (accepted)  cost=0.7444  best=0.7444  temp=0.0025
+SA iter  14: candidate=0.7444 (accepted)  cost=0.7444  best=0.7444  temp=0.0018
+SA iter  15: candidate=0.7444 (accepted)  cost=0.7444  best=0.7444  temp=0.0014
+Best config: {'vocab_size': 30000, 'max_len': 256, 'embedding_dim': 512, 'n_segments': 2, 'attn_heads': 8, 'batch_size': 32, 'epochs': 3, 'num_classes': 4, 'learning_rate': 0.0001, 'dropout': 0.2, 'n_layers': 8}
+Saved SA trace to sa_log.csv
+Training with best config...
+Epoch 1/3  loss=0.7614  train_acc=0.6845  val_acc=0.8537
+Epoch 2/3  loss=0.4496  train_acc=0.8439  val_acc=0.8642
+Epoch 3/3  loss=0.3885  train_acc=0.8661  val_acc=0.8773
+Saved model to model.pt
+
+Test Accuracy: 0.8808
